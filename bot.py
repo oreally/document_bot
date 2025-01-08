@@ -1,4 +1,3 @@
-# import libraries
 import os
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate  
@@ -26,10 +25,20 @@ Helpful answer:
 """
 
 # Initializing Qdrant client
-client = QdrantClient(api_key=qdrant_api_key, url=qdrant_url)
+@st.cache
+def load_qdrant_client():
+    client = QdrantClient(api_key=qdrant_api_key, url=qdrant_url)
+    return client
+
+client = load_qdrant_client()
 
 # Initializing chat model: 
-chat_model = ChatGroq(temperature=0, model_name="mixtral-8x7b-32768")
+@st.cache
+def load_chat_model():
+    model = ChatGroq(temperature=0, model_name="mixtral-8x7b-32768")
+    return model
+
+chat_model = load_chat_model()
 
 
 def chatbot():
