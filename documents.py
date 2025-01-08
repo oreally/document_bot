@@ -25,7 +25,7 @@ parsed_output_file = st.secrets["PARSED_OUTPUT_FILE"]
 utc=pytz.UTC
 
 # Initializing Qdrant client
-@st.cache
+@st.cache_resource
 def load_qdrant_client():
     client = QdrantClient(api_key=qdrant_api_key, url=qdrant_url)
     return client
