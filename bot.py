@@ -25,7 +25,7 @@ Helpful answer:
 """
 
 # Initializing Qdrant client
-@st.cache
+@st.cache_resource
 def load_qdrant_client():
     client = QdrantClient(api_key=qdrant_api_key, url=qdrant_url)
     return client
@@ -33,7 +33,7 @@ def load_qdrant_client():
 client = load_qdrant_client()
 
 # Initializing chat model: 
-@st.cache
+@st.cache_resource
 def load_chat_model():
     model = ChatGroq(temperature=0, model_name="mixtral-8x7b-32768")
     return model
