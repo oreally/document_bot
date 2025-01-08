@@ -33,6 +33,11 @@ def load_qdrant_client():
 
 client = load_qdrant_client()
 
+# Initialize embeddings
+@st.cache_resource
+def get_embeddings():
+    return FastEmbedEmbeddings()
+
 
 def document_manager():
     # Document upload
@@ -157,7 +162,7 @@ def create_vector_database(mode="replace"):
     docs = text_splitter.split_text(parsed_output_string)
     
     # Initialize Embeddings
-    embeddings = FastEmbedEmbeddings()
+    embeddings = get_embeddings()
     
     if mode=="replace":
         # Delete the existing points.
