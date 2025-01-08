@@ -20,7 +20,29 @@ Software And Tools Requirements
 2. Create Llama-Cloud API-KEY
 3. Create Qdrant cluster and API-KEY
 4. Create Groq API-KEY
-5. Store GCS connection info, API-KEYs and Qdrant cluster endpoint URL in streamlit.io secrets (https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management).
+5. Store GCS connection info, API-KEYs and Qdrant cluster endpoint URL in .streamlit/secrets.toml (for local run) and streamlit.io secrets (https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management) for deployment.
+
+LLAMA_CLOUD_API_KEY="..."  
+QDRANT_API_KEY="..."  
+QDRANT_URL="..."  
+GROQ_API_KEY="..."  
+GCS_BUCKET="..."  
+GCS_PROTECTED_FOLDER="source_files" # create these folders in the GCS bucket.  
+GCS_DESTINATION_FOLDER="documents"  
+PARSED_DATA_FILE="parsed_data.pkl" # do not create, is done by parsing the first time.  
+PARSED_OUTPUT_FILE="output.md"  
+
+[connection.gcs] # get these values by creating a key and json file for service account  
+"type"="service_account"  
+"project_id"="..."  
+"private_key_id"="..."  
+"private_key"="..."  
+"client_email"="..."  
+"client_id"="..."  
+"auth_uri"="https://accounts.google.com/o/oauth2/auth"  
+"token_uri"="https://oauth2.googleapis.com/token"  
+"auth_provider_x509_cert_url"="https://www.googleapis.com/oauth2/v1/certs"  
+"client_x509_cert_url"="..."  
  
 ## Run
 Locally: streamlit run main.py
