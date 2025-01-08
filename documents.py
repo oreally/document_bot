@@ -3,23 +3,16 @@ import pandas as pd
 import os
 import glob
 import pickle
-import streamlit as st
 from datetime import datetime
 import pytz
 
 from google.cloud import storage
 
-import nest_asyncio  # noqa: E402
-nest_asyncio.apply()
-
-from pathlib import Path
 from llama_parse import LlamaParse
-
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.vectorstores import Qdrant
 from qdrant_client import QdrantClient
-from langchain_community.document_loaders import DirectoryLoader
 
 llamaparse_api_key = st.secrets["LLAMA_CLOUD_API_KEY"]
 qdrant_url = st.secrets["QDRANT_URL"]
@@ -32,8 +25,12 @@ parsed_output_file = st.secrets["PARSED_OUTPUT_FILE"]
 utc=pytz.UTC
 
 # Initializing Qdrant client
-client = QdrantClient(api_key=qdrant_api_key, url=qdrant_url)
+@st.cache
+def load_qdrant_client():
+    client = QdrantClient(api_key=qdrant_api_key, url=qdrant_url)
+    return client
 
+client = load_qdrant_client()
 
 
 def document_manager():
