@@ -1,0 +1,13 @@
+nest-asyncio==1.6.0
+langchain==0.3.11
+langchain-community==0.3.11
+llama-parse==0.5.17
+fastembed==0.4.2
+qdrant_client==1.12.1
+python-dotenv==1.0.1
+langchain-groq==0.2.1
+streamlit==1.41.1
+pydantic==2.10.1
+unstructured[md]
+gcsfs==2024.12.0
+st-files-connection==0.1.0
