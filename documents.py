@@ -22,6 +22,7 @@ gcs_protected_folder = st.secrets["GCS_PROTECTED_FOLDER"]
 gcs_document_folder = st.secrets["GCS_DESTINATION_FOLDER"]
 parsed_data_file = st.secrets["PARSED_DATA_FILE"]
 parsed_output_file = st.secrets["PARSED_OUTPUT_FILE"]
+project_id = st.secrets["project_id"]
 utc=pytz.UTC
 
 # Initializing Qdrant client
@@ -66,7 +67,7 @@ def document_manager():
 
 
 def list_documents_in_bucket():
-    storage_client = storage.Client()
+    storage_client = storage.Client(project=project_id)
     blobs_1 = storage_client.list_blobs(gcs_bucket, prefix=gcs_protected_folder)
     blobs_2 = storage_client.list_blobs(gcs_bucket, prefix=gcs_document_folder)
     filenames = [blob.name.replace(gcs_protected_folder, '').replace('/','')+' (protected)' for blob in blobs_1] + [blob.name.replace(gcs_document_folder, '').replace('/','') for blob in blobs_2]
@@ -75,7 +76,7 @@ def list_documents_in_bucket():
     
 
 def upload_files_to_bucket(uploaded_files):
-    storage_client = storage.Client()
+    storage_client = storage.Client(project=project_id)
     bucket = storage_client.bucket(gcs_bucket)
     for uploaded_file in uploaded_files:
         destination_blob_name = os.path.join(gcs_document_folder, uploaded_file.name)
@@ -110,7 +111,7 @@ def df_on_change():
     
     
 def delete_documents_from_bucket(selected_files):
-    storage_client = storage.Client()
+    storage_client = storage.Client(project=project_id)
     bucket = storage_client.bucket(gcs_bucket)
     
     for file in selected_files:
@@ -139,7 +140,7 @@ def create_vector_database(mode="replace"):
     llama_parse_documents = load_or_parse_data(mode=mode)
     
     # Load output md file.
-    storage_client = storage.Client()
+    storage_client = storage.Client(project=project_id)
     bucket = storage_client.bucket(gcs_bucket)
     parsed_output = bucket.blob(parsed_output_file)
     parsed_output_string = "" # We overwrite it.
@@ -183,7 +184,7 @@ def load_or_parse_data(mode="replace"):
     parsing_date = utc.localize(datetime.strptime('1970-01-01', '%Y-%m-%d'))
     
     # Load already parsed data, if it exists.
-    storage_client = storage.Client()
+    storage_client = storage.Client(project=project_id)
     bucket = storage_client.bucket(gcs_bucket)
     parsed_data = bucket.blob(parsed_data_file)
     if mode == "append":
