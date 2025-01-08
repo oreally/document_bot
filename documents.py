@@ -22,7 +22,7 @@ gcs_protected_folder = st.secrets["GCS_PROTECTED_FOLDER"]
 gcs_document_folder = st.secrets["GCS_DESTINATION_FOLDER"]
 parsed_data_file = st.secrets["PARSED_DATA_FILE"]
 parsed_output_file = st.secrets["PARSED_OUTPUT_FILE"]
-project_id = st.secrets["project_id"]
+project_id = st.secrets.connection.gcs["project_id"]
 utc=pytz.UTC
 
 # Initializing Qdrant client
