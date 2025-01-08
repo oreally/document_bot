@@ -1,7 +1,7 @@
 import streamlit as st
 
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
-    st.markdown(
+st.markdown(
         """
     <style>
         [data-testid="collapsedControl"] {
