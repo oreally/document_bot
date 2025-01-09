@@ -5,14 +5,27 @@ import glob
 import pickle
 from datetime import datetime
 import pytz
-
-from google.cloud import storage
+import gcsfs
 
 from llama_parse import LlamaParse
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.vectorstores import Qdrant
 from qdrant_client import QdrantClient
+
+fs = gcsfs.GCSFileSystem(token={
+    'type': st.secrets.connection.gcs["type"],
+    'project_id': st.secrets.connection.gcs["project_id"],
+    'private_key_id': st.secrets.connection.gcs["private_key_id"],
+    'private_key': st.secrets.connection.gcs["private_key"],
+    'client_email': st.secrets.connection.gcs["client_email"],
+    'client_id': st.secrets.connection.gcs["client_id"],
+    'auth_uri': st.secrets.connection.gcs["auth_uri"],
+    'token_uri': st.secrets.connection.gcs["token_uri"],
+    'auth_provider_x509_cert_url': st.secrets.connection.gcs["auth_provider_x509_cert_url"],
+    'client_x509_cert_url': st.secrets.connection.gcs["client_x509_cert_url"],
+    'universe_domain': st.secrets.connection.gcs["universe_domain"]
+})
 
 llamaparse_api_key = st.secrets["LLAMA_CLOUD_API_KEY"]
 qdrant_url = st.secrets["QDRANT_URL"]
@@ -72,21 +85,19 @@ def document_manager():
 
 
 def list_documents_in_bucket():
-    storage_client = storage.Client(project=project_id)
-    blobs_1 = storage_client.list_blobs(gcs_bucket, prefix=gcs_protected_folder)
-    blobs_2 = storage_client.list_blobs(gcs_bucket, prefix=gcs_document_folder)
-    filenames = [blob.name.replace(gcs_protected_folder, '').replace('/','')+' (protected)' for blob in blobs_1] + [blob.name.replace(gcs_document_folder, '').replace('/','') for blob in blobs_2]
+    protected_files = fs.ls(os.path.join(gcs_bucket, gcs_protected_folder))
+    customer_files = fs.ls(os.path.join(gcs_bucket, gcs_document_folder))
+    filenames = [f.replace(gcs_bucket, '').replace(gcs_protected_folder, '').replace('/','')+' (protected)' for f in protected_files] + \
+        [f.replace(gcs_bucket, '').replace(gcs_document_folder, '').replace('/','') for f in customer_files]
     filenames = [f for f in filenames if (f!='') & (f!=' (protected)')]
     return filenames
     
 
 def upload_files_to_bucket(uploaded_files):
-    storage_client = storage.Client(project=project_id)
-    bucket = storage_client.bucket(gcs_bucket)
     for uploaded_file in uploaded_files:
-        destination_blob_name = os.path.join(gcs_document_folder, uploaded_file.name)
-        blob = bucket.blob(destination_blob_name)
-        blob.upload_from_file(uploaded_file)
+        destination_blob_name = os.path.join(gcs_bucket, gcs_document_folder, uploaded_file.name)
+        with fs.open(destination_blob_name, 'wb') as f:
+            f.write(uploaded_file.getbuffer())
     return list_documents_in_bucket()
 
 
@@ -116,19 +127,11 @@ def df_on_change():
     
     
 def delete_documents_from_bucket(selected_files):
-    storage_client = storage.Client(project=project_id)
-    bucket = storage_client.bucket(gcs_bucket)
-    
     for file in selected_files:
-        path_to_delete = os.path.join(gcs_document_folder, file)
-        blob = bucket.blob(path_to_delete)
-        if blob.exists():
-            # Optional: set a generation-match precondition to avoid potential race conditions
-            # and data corruptions. The request to delete is aborted if the object's
-            # generation number does not match your precondition.
-            blob.reload()  # Fetch blob metadata to use in generation_match_precondition.
-            generation_match_precondition = blob.generation
-            blob.delete(if_generation_match=generation_match_precondition)
+        path_to_delete = os.path.join(gcs_bucket, gcs_document_folder, file)
+        if fs.exists(path_to_delete):
+            f = fs.open(path_to_delete)
+            f.fs.delete(f.path)
     return list_documents_in_bucket()
 
 
@@ -144,18 +147,15 @@ def create_vector_database(mode="replace"):
     # Call the function to either load or parse the data
     llama_parse_documents = load_or_parse_data(mode=mode)
     
-    # Load output md file.
-    storage_client = storage.Client(project=project_id)
-    bucket = storage_client.bucket(gcs_bucket)
-    parsed_output = bucket.blob(parsed_output_file)
-    parsed_output_string = "" # We overwrite it.
+    # Overwrite output md file.
+    parsed_output_string = "" 
     
     # Add parsed documents.
     for doc in llama_parse_documents:
         parsed_output_string = parsed_output_string + doc.text + '\n'
-
-    if len(parsed_output_string)>0:
-        parsed_output.upload_from_string(parsed_output_string)
+            
+    with fs.open(os.path.join(gcs_bucket, parsed_output_file), "w") as f:
+        f.write(parsed_output_string)
     
     # Split loaded documents into chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=100)
@@ -167,10 +167,11 @@ def create_vector_database(mode="replace"):
     if mode=="replace":
         # Delete the existing points.
         num_points = client.count(collection_name="rag_store", exact=True).count
-        points = client.scroll(collection_name="rag_store", limit=num_points)
-        ids = [p.id for p in points[0]]
-        vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag_store")
-        vectorstore.delete(ids=ids)
+        if num_points > 0:
+            points = client.scroll(collection_name="rag_store", limit=num_points)
+            ids = [p.id for p in points[0]]
+            vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag_store")
+            vectorstore.delete(ids=ids)
         
     # Create and persist a Chroma vector database from the chunked documents.
     qdrant = Qdrant.from_texts(
@@ -189,21 +190,18 @@ def load_or_parse_data(mode="replace"):
     parsing_date = utc.localize(datetime.strptime('1970-01-01', '%Y-%m-%d'))
     
     # Load already parsed data, if it exists.
-    storage_client = storage.Client(project=project_id)
-    bucket = storage_client.bucket(gcs_bucket)
-    parsed_data = bucket.blob(parsed_data_file)
+    path_to_parsed_data = os.path.join(gcs_bucket, parsed_data_file)
     if mode == "append":
-        parsed_data_info = bucket.get_blob(parsed_data_file)
-        if parsed_data.exists():
-            pickle_in = parsed_data.download_as_string()
-            llama_parse_documents = llama_parse_documents + pickle.loads(pickle_in)
-            parsing_date = parsed_data_info.updated
+        if fs.exists(path_to_parsed_data):
+            with fs.open(path_to_parsed_data, "rb") as f:
+                llama_parse_documents = llama_parse_documents + pickle.load(f)
+                parsing_date = fs.modified(path_to_parsed_data)
     
     # In addition, we need to parse files which are newer than the data_file.
-    blobs_1 = storage_client.list_blobs(gcs_bucket, prefix=gcs_protected_folder)
-    blobs_2 = storage_client.list_blobs(gcs_bucket, prefix=gcs_document_folder)
-    files_to_parse = [blob for blob in blobs_1 if blob.updated > parsing_date] + [blob for blob in blobs_2 if blob.updated > parsing_date]
-    files_to_parse = [f for f in files_to_parse if (f.name!=gcs_protected_folder+'/') & (f.name!=gcs_document_folder+'/')]
+    protected_files = fs.ls(os.path.join(gcs_bucket, gcs_protected_folder))
+    customer_files = fs.ls(os.path.join(gcs_bucket, gcs_document_folder))
+    files_to_parse = [f for f in protected_files if fs.isdir(f)==False] + [f for f in customer_files if fs.isdir(f)==False]
+    files_to_parse = [f for f in files_to_parse if fs.created(f) > parsing_date]
 
     if len(files_to_parse)==0:
         return llama_parse_documents
@@ -215,14 +213,15 @@ def load_or_parse_data(mode="replace"):
 
     for file in files_to_parse:
         # Perform the parsing step and store the result in llama_parse_documents
-        destination_file_name = os.path.join("/tmp", file.name.split('/')[-1])
-        file.download_to_filename(destination_file_name)
-        llama_parse_documents = llama_parse_documents + parser.load_data(destination_file_name)
+        if fs.exists(file):
+            local_path = os.path.join("tmp", file)
+            fs.download(file, local_path)
+            llama_parse_documents = llama_parse_documents + parser.load_data(local_path)
 
     # Save the parsed data to a file
     if len(llama_parse_documents)>0:
-        pickle_out = pickle.dumps(llama_parse_documents)
-        parsed_data.upload_from_string(pickle_out)
+        with fs.open(path_to_parsed_data, "wb") as f:
+            pickle.dump(llama_parse_documents, f)
         
     return llama_parse_documents
 
