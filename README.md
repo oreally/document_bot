@@ -3,7 +3,7 @@ Streamlit app for RAG chat with documents, using GCS, LlamaParse, Qdrant, and th
 
 Original sources: https://github.com/divakarkumarp/RAG-Chat-with-Documents/tree/main, https://huggingface.co/ThisIs-Developer/Llama-2-GGML-Medical-Chatbot
 
-However, the code from there has changed a lot.
+However, the code from there has now changed a lot, since the document manager was added.
  
 ## Overview:
 Software And Tools Requirements
