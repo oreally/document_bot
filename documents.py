@@ -166,12 +166,13 @@ def create_vector_database(mode="replace"):
     
     if mode=="replace":
         # Delete the existing points.
-        num_points = client.count(collection_name="rag_store", exact=True).count
-        if num_points > 0:
-            points = client.scroll(collection_name="rag_store", limit=num_points)
-            ids = [p.id for p in points[0]]
-            vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag_store")
-            vectorstore.delete(ids=ids)
+        if client.collection_exists(collection_name="rag_store"):
+            num_points = client.count(collection_name="rag_store", exact=True).count
+            if num_points > 0:
+                points = client.scroll(collection_name="rag_store", limit=num_points)
+                ids = [p.id for p in points[0]]
+                vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag_store")
+                vectorstore.delete(ids=ids)
         
     # Create and persist a Chroma vector database from the chunked documents.
     qdrant = Qdrant.from_texts(
