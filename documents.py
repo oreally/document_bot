@@ -6,6 +6,7 @@ import pickle
 from datetime import datetime
 import pytz
 import gcsfs
+import pathlib
 
 from llama_parse import LlamaParse
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -85,8 +86,8 @@ def document_manager():
 
 
 def list_documents_in_bucket():
-    protected_files = fs.ls(os.path.join(gcs_bucket, gcs_protected_folder))
-    customer_files = fs.ls(os.path.join(gcs_bucket, gcs_document_folder))
+    protected_files = fs.ls(f"{gcs_bucket}/{gcs_protected_folder}")
+    customer_files = fs.ls(f"{gcs_bucket}/{gcs_document_folder}")
     filenames = [f.replace(gcs_bucket, '').replace(gcs_protected_folder, '').replace('/','')+' (protected)' for f in protected_files] + \
         [f.replace(gcs_bucket, '').replace(gcs_document_folder, '').replace('/','') for f in customer_files]
     filenames = [f for f in filenames if (f!='') & (f!=' (protected)')]
@@ -95,7 +96,7 @@ def list_documents_in_bucket():
 
 def upload_files_to_bucket(uploaded_files):
     for uploaded_file in uploaded_files:
-        destination_blob_name = os.path.join(gcs_bucket, gcs_document_folder, uploaded_file.name)
+        destination_blob_name = f"{gcs_bucket}/{gcs_document_folder}/{uploaded_file.name}"
         with fs.open(destination_blob_name, 'wb') as f:
             f.write(uploaded_file.getbuffer())
     return list_documents_in_bucket()
@@ -128,7 +129,7 @@ def df_on_change():
     
 def delete_documents_from_bucket(selected_files):
     for file in selected_files:
-        path_to_delete = os.path.join(gcs_bucket, gcs_document_folder, file)
+        path_to_delete = f"{gcs_bucket}/{gcs_document_folder}/{file}"
         if fs.exists(path_to_delete):
             f = fs.open(path_to_delete)
             f.fs.delete(f.path)
@@ -154,7 +155,7 @@ def create_vector_database(mode="replace"):
     for doc in llama_parse_documents:
         parsed_output_string = parsed_output_string + doc.text + '\n'
             
-    with fs.open(os.path.join(gcs_bucket, parsed_output_file), "w") as f:
+    with fs.open(f"{gcs_bucket}/{parsed_output_file}", "w", encoding="utf-8") as f:
         f.write(parsed_output_string)
     
     # Split loaded documents into chunks
@@ -166,13 +167,12 @@ def create_vector_database(mode="replace"):
     
     if mode=="replace":
         # Delete the existing points.
-        if client.collection_exists(collection_name="rag_store"):
-            num_points = client.count(collection_name="rag_store", exact=True).count
-            if num_points > 0:
-                points = client.scroll(collection_name="rag_store", limit=num_points)
-                ids = [p.id for p in points[0]]
-                vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag_store")
-                vectorstore.delete(ids=ids)
+        num_points = client.count(collection_name="rag_store", exact=True).count
+        if num_points > 0:
+            points = client.scroll(collection_name="rag_store", limit=num_points)
+            ids = [p.id for p in points[0]]
+            vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag_store")
+            vectorstore.delete(ids=ids)
         
     # Create and persist a Chroma vector database from the chunked documents.
     qdrant = Qdrant.from_texts(
@@ -191,7 +191,7 @@ def load_or_parse_data(mode="replace"):
     parsing_date = utc.localize(datetime.strptime('1970-01-01', '%Y-%m-%d'))
     
     # Load already parsed data, if it exists.
-    path_to_parsed_data = os.path.join(gcs_bucket, parsed_data_file)
+    path_to_parsed_data = f"{gcs_bucket}/{parsed_data_file}"
     if mode == "append":
         if fs.exists(path_to_parsed_data):
             with fs.open(path_to_parsed_data, "rb") as f:
@@ -199,8 +199,8 @@ def load_or_parse_data(mode="replace"):
                 parsing_date = fs.modified(path_to_parsed_data)
     
     # In addition, we need to parse files which are newer than the data_file.
-    protected_files = fs.ls(os.path.join(gcs_bucket, gcs_protected_folder))
-    customer_files = fs.ls(os.path.join(gcs_bucket, gcs_document_folder))
+    protected_files = fs.ls(f"{gcs_bucket}/{gcs_protected_folder}")
+    customer_files = fs.ls(f"{gcs_bucket}/{gcs_document_folder}")
     files_to_parse = [f for f in protected_files if fs.isdir(f)==False] + [f for f in customer_files if fs.isdir(f)==False]
     files_to_parse = [f for f in files_to_parse if fs.created(f) > parsing_date]
 
@@ -215,7 +215,7 @@ def load_or_parse_data(mode="replace"):
     for file in files_to_parse:
         # Perform the parsing step and store the result in llama_parse_documents
         if fs.exists(file):
-            local_path = os.path.join("tmp", file)
+            local_path = f"tmp/{file}"
             fs.download(file, local_path)
             llama_parse_documents = llama_parse_documents + parser.load_data(local_path)
 
