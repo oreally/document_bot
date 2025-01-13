@@ -46,12 +46,18 @@ client_x509_cert_url="..."
 universe_domain="googleapis.com"  
  
 ## Run
-Locally: streamlit run main.py
+Locally: Create a .streamlit folder and a secrets.toml file in that folder with the secrets above. Then run the following commands in a terminal:
+
+### Linux
+python3 -m venv .venv && source .venv/bin/activate  
+pip install -r requirements.txt  
+streamlit run main.py  
 
 ### Windows
-python3.9 -m venv .venv
-source .venv/Scripts/activate
-pip install -r requirements.txt
+python3.9 -m venv .venv  
+source .venv/Scripts/activate  
+pip install -r requirements.txt  
+streamlit run main.py  
 
 ### Streamlit Community Cloud: 
 Fork the repository so you have your own. Then sign in to Streamlit Community Cloud. Create an app based on your github repository. Then add the secrets to the app settings and reboot the app!
