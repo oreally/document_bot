@@ -14,6 +14,7 @@ Software And Tools Requirements
 4. [Groq](https://groq.com/)
 5. [Langchain🦜](https://www.langchain.com/)
 6. [Langchain Smith 🦜](https://smith.langchain.com/o/32390bae-a13d-5a53-b61b-501e3f39e496/projects/p/7e7575b9-5a88-46e5-b7d1-819569ebb004?timeModel=%7B%22duration%22%3A%227d%22%7D&tab=0)
+7. [Streamlit](https://share.streamlit.io/)
 
 ## Prepare
 1. Create Google-Cloud Storage bucket and service account with update permissions
